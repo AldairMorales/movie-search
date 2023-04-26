@@ -1,40 +1,66 @@
-
-import { Inter } from 'next/font/google'
 import style from '../styles/Home.module.css'
-import responseMovies from '../mocks/with-results.json'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Movies } from '@/components/Movies'
+import { useMovies } from '@/hooks/useMovies'
+import debounce from 'just-debounce-it'
 
-import Image from 'next/image'
+function useSearch (){
+  const [ search, updateSearch ] = useState('')
+  const [ error, setError ] = useState(null)
+  const isFirstInput = useRef(true)
 
-const inter = Inter({ subsets: ['latin'] })
+  useEffect(() => {
+
+    if (isFirstInput.current) {
+      isFirstInput.current = search === ''
+      return
+    }
+
+    if (search === '') {
+      setError('You cannot search for an empty movie.')
+    }
+    if (search.match(/\d+$/)) {
+      setError('You cannot search for a movie with a number.')
+    }
+  },[search])
+
+  return [ search, updateSearch, error]
+}
 
 export default function Home() {
-  const movies = responseMovies.Search
-  const hasMovies = movies?.lenght > 0
+  const [ search, updateSearch, error ] = useSearch()
+  const { movies, isLoading, getMovies } = useMovies({search})
+
+  const debouncedGetMovies = useCallback(
+    debounce(search => {
+      console.log('search', search)
+      getMovies(search)
+    }, 500)
+  ,[getMovies])
+  
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    getMovies(search)
+  }
+
+  const handleChange = (event) => {
+    const newSearch = event.target.value
+    updateSearch(newSearch)
+   debouncedGetMovies(newSearch)
+  }
 
   return (
     <div className={style.page}>
       <header className={style.header}>
-        <h1>Buscador de imagenes</h1>
-        <form className={style.form}>
-          <input placeholder='Advengers, Mario bross...'/>
-          <button>Search</button>
+        <h1>Film search engine</h1>
+        <form className={style.form} onSubmit={handleSubmit}>
+          <input onChange={handleChange} value={search} placeholder='Advengers, Mario bross...'/>
+          <button type="submit">Search</button>
         </form>
       </header>
-      <main className='main'>
+      <main className={style.main}>
         {
-          
-            <ul>
-              {
-                movies.map(movie => (
-                  <l1 key={movie.imdbID}>
-                    <h3>{movie.Title}</h3>
-                    <p>{movie.Year}</p>
-                    <img src={movie.Poster} alt={movie.Title} />
-                  </l1>
-                ))
-              }
-            </ul>
-        
+          isLoading ? <p>Loading...</p> : <Movies  movies={movies}/>
         }
       </main>
     </div>
